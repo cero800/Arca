@@ -2,7 +2,7 @@
 
 Archivo privado para guardar lo que quieres conservar: imágenes, videos, PDFs, audio y texto, organizados en **baúles**. Un solo dueño, sin registro público.
 
-> Estado: **etapa 1–2 en progreso**. Funcionan auth, baúles, subida directa a B2, comentarios, explorador con vista previa y la cola de procesamiento. El worker de medios ya genera derivados (miniaturas, previsualizaciones, HLS 720p, waveform y páginas de PDF), pero el player HLS con URLs firmadas por segmento es la siguiente iteración.
+> Estado: **etapa 1–3 en progreso**. Funcionan auth, baúles, subida directa a B2, comentarios, explorador con vista previa, papelera, worker de medios y enlaces para compartir. El player HLS usa un endpoint propio que reescribe la playlist con URLs firmadas por segmento.
 
 ## Stack
 
@@ -164,8 +164,8 @@ Para el disparo inmediato, crea un fine-grained PAT con permiso de **Contents: r
 - **Assets**: dedupe por `sha256` y baúl (índice único parcial), papelera con `deleted_at`, estados `uploading → processing → ready | error`.
 - **Subida**: el navegador pide un intent, sube el original directo a B2 (simple o multipart) y confirma; la API verifica con `HeadObject` y encola el job.
 - **Derivados**: tabla `derivative` con thumb, preview, poster, HLS, páginas de PDF, waveform y texto. El worker descarga el original a `/tmp`, ejecuta ffmpeg y sube los resultados.
-- **Comentarios**: `author_id` (owner) o `guest_id` (invitados futuros), con `at_second` para notas de video/audio.
-- **Compartir**: `share_link` guarda solo el hash del token, con rol `viewer | commenter` y revocación.
+- **Comentarios**: `author_id` (owner) o `guest_id` (invitados), con `at_second` para notas de video/audio.
+- **Compartir**: `share_link` guarda solo el hash del token, con rol `viewer | commenter`, caducidad opcional y revocación. La cookie del invitado va firmada con HMAC; el enlace se valida en cada lectura y en cada petición HLS (`?share=`).
 
 Decisiones detalladas en [`docs/adr`](docs/adr).
 
@@ -183,10 +183,10 @@ Decisiones detalladas en [`docs/adr`](docs/adr).
 - [x] Scaffold, auth, esquema, shell visual
 - [x] Baúles, subida directa, comentarios, explorador
 - [x] Worker Go: miniaturas, posters, HLS 720p, PDF, texto, waveform
-- [ ] Player HLS con reescritura de playlist firmada
-- [ ] Papelera y restauración desde la UI
-- [ ] Enlaces para compartir + comentarios de invitados
-- [ ] Quick look, `⌘K`, drag & drop desde portapapeles
+- [x] Player HLS con reescritura de playlist firmada
+- [x] Papelera y restauración desde la UI
+- [x] Enlaces para compartir + comentarios de invitados
+- [x] Quick look, `⌘K`, drag & drop desde portapapeles
 - [ ] CLI de backup (`arca put`, `arca pull`)
 - [ ] Storyboard VTT y scrubbing en video
 

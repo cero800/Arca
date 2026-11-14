@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
-import { db, comment, vault } from "@arca/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { db, asset, comment, vault } from "@arca/db";
 import { createCommentSchema } from "@arca/core";
 import { requireUser } from "@/lib/session";
 
@@ -37,6 +37,30 @@ export async function createCommentAction(
 
   if (!found || found.ownerId !== user.id) {
     return { error: "Baúl no encontrado." };
+  }
+
+  if (parsed.data.assetId) {
+    const target = await db.query.asset.findFirst({
+      where: and(
+        eq(asset.id, parsed.data.assetId),
+        eq(asset.vaultId, found.id),
+        isNull(asset.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (!target) return { error: "Archivo no encontrado." };
+  }
+
+  if (parsed.data.parentId) {
+    const parent = await db.query.comment.findFirst({
+      where: and(
+        eq(comment.id, parsed.data.parentId),
+        eq(comment.vaultId, found.id),
+        isNull(comment.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (!parent) return { error: "Comentario original no encontrado." };
   }
 
   await db.insert(comment).values({

@@ -1,7 +1,9 @@
 import "server-only";
+import { cache } from "react";
 import { and, asc, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
-import { db, asset, comment, derivative, vault, type Vault } from "@arca/db";
+import { db, asset, comment, derivative, shareLink, vault, type Vault } from "@arca/db";
 import { signedUrl } from "./media";
+import { getShareContext } from "./share";
 
 export type VaultSummary = {
   id: string;
@@ -176,3 +178,81 @@ export function derivativeOf(
 ): string | null {
   return asset.derivatives.find((item) => item.type === type)?.url ?? null;
 }
+
+export type ShareLinkSummary = {
+  id: string;
+  role: "viewer" | "commenter";
+  createdAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+};
+
+export async function listShareLinks(vaultId: string): Promise<ShareLinkSummary[]> {
+  const rows = await db
+    .select({
+      id: shareLink.id,
+      role: shareLink.role,
+      createdAt: shareLink.createdAt,
+      expiresAt: shareLink.expiresAt,
+      revokedAt: shareLink.revokedAt,
+    })
+    .from(shareLink)
+    .where(eq(shareLink.vaultId, vaultId))
+    .orderBy(desc(shareLink.createdAt));
+
+  return rows.map((row) => ({
+    id: row.id,
+    role: row.role,
+    createdAt: row.createdAt.toISOString(),
+    expiresAt: row.expiresAt?.toISOString() ?? null,
+    revokedAt: row.revokedAt?.toISOString() ?? null,
+  }));
+}
+
+/**
+ * Carga el baúl y sus archivos para una vista compartida.
+ *
+ * Cualquier persona con el token puede leer los archivos y sus notas; el rol
+ * del enlace decide si además puede comentar.
+ */
+export const getSharedWorkspace = cache(async function getSharedWorkspace(
+  token: string,
+) {
+  const context = await getShareContext(token);
+  if (!context) return null;
+
+  const assetRows = await db.query.asset.findMany({
+    where: and(eq(asset.vaultId, context.vault.id), isNull(asset.deletedAt)),
+    with: { derivatives: true },
+    orderBy: [desc(asset.createdAt)],
+  });
+
+  const commentRows = await db.query.comment.findMany({
+    where: and(eq(comment.vaultId, context.vault.id), isNull(comment.deletedAt)),
+    with: { author: true, guest: true },
+    orderBy: [asc(comment.createdAt)],
+  });
+
+  const assets: ExplorerAsset[] = await Promise.all(
+    assetRows.map((row) => toExplorerAsset(row)),
+  );
+
+  const comments: ExplorerComment[] = commentRows.map((row) => ({
+    id: row.id,
+    assetId: row.assetId,
+    parentId: row.parentId,
+    body: row.body,
+    atSecond: row.atSecond,
+    createdAt: row.createdAt.toISOString(),
+    authorName: row.author?.name ?? row.guest?.name ?? "Invitado",
+    authorKind: row.author ? "owner" : "guest",
+  }));
+
+  return {
+    role: context.link.role,
+    expiresAt: context.link.expiresAt?.toISOString() ?? null,
+    vault: context.vault,
+    assets,
+    comments,
+  };
+});

@@ -48,7 +48,7 @@ export function AssetList({
   onSelect: (id: string) => void;
   view: "list" | "grid";
   hasAssets: boolean;
-  onFiles: (files: File[]) => void;
+  onFiles?: (files: File[]) => void;
 }) {
   if (!hasAssets) {
     return (
@@ -58,20 +58,25 @@ export function AssetList({
             <UploadCloud className="h-6 w-6" strokeWidth={1.25} />
           </div>
           <h2 className="font-display text-[20px] font-semibold text-ink">
-            Este baúl está vacío
+            {onFiles ? "Este baúl está vacío" : "Todavía no hay archivos"}
           </h2>
           <p className="mx-auto mt-1.5 max-w-[300px] text-[12.5px] leading-relaxed text-muted">
-            Arrastra fotos, videos, documentos o texto aquí. Todo queda privado y
-            organizado en un solo lugar.
+            {onFiles
+              ? "Arrastra fotos, videos, documentos o texto aquí. Todo queda privado y organizado en un solo lugar."
+              : "Quien compartió este baúl aún no ha guardado nada. Vuelve más tarde."}
           </p>
-          <UploadButton
-            onFiles={onFiles}
-            label="Subir los primeros archivos"
-            className="mt-5"
-          />
-          <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-faint">
-            Hasta 1 GB por archivo · 10 GB en total
-          </p>
+          {onFiles ? (
+            <>
+              <UploadButton
+                onFiles={onFiles}
+                label="Subir los primeros archivos"
+                className="mt-5"
+              />
+              <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-faint">
+                Hasta 1 GB por archivo · 10 GB en total
+              </p>
+            </>
+          ) : null}
         </div>
       </div>
     );

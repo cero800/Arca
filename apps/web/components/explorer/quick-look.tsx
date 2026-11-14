@@ -21,6 +21,7 @@ export function QuickLook({
   onClose,
   onPrevious,
   onNext,
+  shareToken,
 }: {
   asset: ExplorerAsset;
   index: number;
@@ -28,6 +29,7 @@ export function QuickLook({
   onClose: () => void;
   onPrevious: () => void;
   onNext: () => void;
+  shareToken?: string;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -91,7 +93,7 @@ export function QuickLook({
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        <AssetPreview asset={asset} large />
+        <AssetPreview asset={asset} large shareToken={shareToken} />
       </div>
 
       <footer className="flex h-10 shrink-0 items-center gap-4 border-t border-line px-4 font-mono text-[10px] text-faint">

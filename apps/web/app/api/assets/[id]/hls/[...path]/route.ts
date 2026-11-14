@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db, asset } from "@arca/db";
 import { auth } from "@/lib/auth";
 import { rewritePlaylist } from "@/lib/hls";
+import { getShareContext } from "@/lib/share";
 import { getObjectText, presignGet } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -21,14 +22,9 @@ const SAFE_SEGMENT = /^[A-Za-z0-9._-]+$/;
  *   que el tráfico pesado no pasa por Vercel.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string; path: string[] }> },
 ) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
   const { id, path } = await params;
 
   if (
@@ -40,13 +36,30 @@ export async function GET(
     return NextResponse.json({ error: "Ruta inválida" }, { status: 400 });
   }
 
+  const session = await auth.api.getSession({ headers: await headers() });
+  const shareToken = new URL(request.url).searchParams.get("share");
+  if (!session && !shareToken) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const found = await db.query.asset.findFirst({
-    where: and(eq(asset.id, id), eq(asset.ownerId, session.user.id), isNull(asset.deletedAt)),
-    columns: { id: true, vaultId: true, kind: true },
+    where: and(eq(asset.id, id), isNull(asset.deletedAt)),
+    columns: { id: true, vaultId: true, ownerId: true, kind: true },
   });
 
   if (!found || found.kind !== "video") {
     return NextResponse.json({ error: "Video no encontrado" }, { status: 404 });
+  }
+
+  if (session) {
+    if (found.ownerId !== session.user.id) {
+      return NextResponse.json({ error: "Video no encontrado" }, { status: 404 });
+    }
+  } else {
+    const context = shareToken ? await getShareContext(shareToken) : null;
+    if (!context || context.vault.id !== found.vaultId) {
+      return NextResponse.json({ error: "Enlace no válido" }, { status: 404 });
+    }
   }
 
   const key = `vaults/${found.vaultId}/${found.id}/hls/${path.join("/")}`;

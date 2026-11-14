@@ -43,7 +43,13 @@ function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function TextPreview({ assetId }: { assetId: string }) {
+function TextPreview({
+  assetId,
+  shareToken,
+}: {
+  assetId: string;
+  shareToken?: string;
+}) {
   const [state, setState] = useState<{ body: string; truncated: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +58,9 @@ function TextPreview({ assetId }: { assetId: string }) {
     setState(null);
     setError(null);
 
-    fetch(`/api/assets/${assetId}/text`)
+    const query = shareToken ? `?share=${encodeURIComponent(shareToken)}` : "";
+
+    fetch(`/api/assets/${assetId}/text${query}`)
       .then(async (response) => {
         if (!response.ok) throw new Error(`No se pudo leer el archivo (${response.status})`);
         return (await response.json()) as { body: string; truncated: boolean };
@@ -67,7 +75,7 @@ function TextPreview({ assetId }: { assetId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [assetId]);
+  }, [assetId, shareToken]);
 
   if (error) {
     return (
@@ -105,9 +113,11 @@ function TextPreview({ assetId }: { assetId: string }) {
 export function AssetPreview({
   asset,
   large = false,
+  shareToken,
 }: {
   asset: ExplorerAsset;
   large?: boolean;
+  shareToken?: string;
 }) {
   const poster = previewOf(asset, "poster");
   const padding = large ? "p-6 lg:p-10" : "p-4";
@@ -163,6 +173,7 @@ export function AssetPreview({
         poster={poster}
         fallbackUrl={asset.originalUrl}
         hasHls={hasHls}
+        shareToken={shareToken}
       />
     );
   }
@@ -225,7 +236,7 @@ export function AssetPreview({
   }
 
   if (asset.kind === "text") {
-    return <TextPreview assetId={asset.id} />;
+    return <TextPreview assetId={asset.id} shareToken={shareToken} />;
   }
 
   return <FallbackPreview asset={asset} />;
@@ -269,6 +280,10 @@ export function PreviewPanel({
   onNext,
   onQuickLook,
   className,
+  readOnly = false,
+  shareToken,
+  composer,
+  privacyLabel = "Solo tú · enlace privado",
 }: {
   vault: PreviewVault;
   asset: ExplorerAsset | null;
@@ -278,6 +293,10 @@ export function PreviewPanel({
   onNext?: () => void;
   onQuickLook?: () => void;
   className?: string;
+  readOnly?: boolean;
+  shareToken?: string;
+  composer?: React.ReactNode | null;
+  privacyLabel?: string;
 }) {
   return (
     <div
@@ -364,7 +383,9 @@ export function PreviewPanel({
                 <Maximize2 className="h-3.5 w-3.5" />
               </button>
             ) : null}
-            <TrashAssetButton assetId={asset.id} assetName={asset.name} />
+            {readOnly ? null : (
+              <TrashAssetButton assetId={asset.id} assetName={asset.name} />
+            )}
           </div>
         ) : null}
       </header>
@@ -373,7 +394,7 @@ export function PreviewPanel({
         {asset ? (
           <div className="flex h-full flex-col">
             <div className="min-h-[220px] flex-1 overflow-hidden">
-              <AssetPreview asset={asset} />
+              <AssetPreview asset={asset} shareToken={shareToken} />
             </div>
 
             <dl className="grid shrink-0 gap-x-6 border-t border-line px-4 py-2.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -407,7 +428,7 @@ export function PreviewPanel({
 
               <dl className="mt-6 max-w-[300px]">
                 <MetaRow label="Archivos" value={`${vault.assetCount}`} />
-                <MetaRow label="Privacidad" value="Solo tú · enlace privado" />
+                <MetaRow label="Privacidad" value={privacyLabel} />
               </dl>
 
               <p className="mt-6 text-[11px] text-faint">Elige un archivo para verlo.</p>
@@ -444,6 +465,7 @@ export function PreviewPanel({
           assetId={asset?.id ?? null}
           comments={comments}
           title={asset ? "Notas del archivo" : "Notas del baúl"}
+          composer={composer}
         />
       </div>
     </div>

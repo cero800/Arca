@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, ShieldCheck, Trash2 } from "lucide-react";
-import { getVaultBySlug } from "@/lib/queries";
+import { ArrowLeft, ArrowUpRight, Link2, Trash2 } from "lucide-react";
+import { getVaultBySlug, listShareLinks } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
 import { VaultForm } from "@/components/vaults/vault-form";
 import { DeleteVault } from "@/components/vaults/delete-vault";
+import { ShareLinks } from "@/components/vaults/share-links";
 
 export async function generateMetadata({
   params,
@@ -27,6 +28,8 @@ export default async function VaultSettingsPage({
   const vault = await getVaultBySlug(slug);
 
   if (!vault || vault.ownerId !== user.id) notFound();
+
+  const links = await listShareLinks(vault.id);
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -50,14 +53,18 @@ export default async function VaultSettingsPage({
 
         <section className="mt-6 rounded-[12px] border border-line bg-surface-1/60 p-4">
           <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-ok" />
-            <div>
-              <h2 className="text-[13px] font-medium text-ink">Enlace privado</h2>
+            <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-[13px] font-medium text-ink">Enlaces para compartir</h2>
               <p className="mt-1 text-[11.5px] leading-relaxed text-muted">
-                Los enlaces para compartir llegan en la siguiente etapa. Serán revocables y con
-                roles de solo lectura o comentarios.
+                Crea un enlace revocable con permiso de solo lectura o comentarios.
+                Los enlaces no permiten subir ni borrar archivos.
               </p>
             </div>
+          </div>
+
+          <div className="mt-4">
+            <ShareLinks vaultId={vault.id} links={links} />
           </div>
         </section>
 

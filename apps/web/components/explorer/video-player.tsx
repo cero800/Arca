@@ -14,17 +14,21 @@ export function VideoPlayer({
   poster,
   fallbackUrl,
   hasHls,
+  shareToken,
 }: {
   assetId: string;
   poster: string | null;
   fallbackUrl: string | null;
   hasHls: boolean;
+  shareToken?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mode, setMode] = useState<"hls" | "original">(hasHls ? "hls" : "original");
   const [failed, setFailed] = useState(false);
 
-  const hlsUrl = `/api/assets/${assetId}/hls/master.m3u8`;
+  const hlsUrl = `/api/assets/${assetId}/hls/master.m3u8${
+    shareToken ? `?share=${encodeURIComponent(shareToken)}` : ""
+  }`;
 
   useEffect(() => {
     if (mode !== "hls") return;

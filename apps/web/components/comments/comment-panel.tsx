@@ -25,11 +25,14 @@ export function CommentPanel({
   assetId,
   comments,
   title,
+  composer,
 }: {
   vaultId: string;
   assetId?: string | null;
   comments: ExplorerComment[];
   title: string;
+  /** undefined = formulario del dueño; null = sin formulario; nodo = formulario propio. */
+  composer?: React.ReactNode | null;
 }) {
   const visible = comments.filter((item) =>
     assetId ? item.assetId === assetId : item.assetId === null && item.parentId === null,
@@ -85,9 +88,11 @@ export function CommentPanel({
         )}
       </div>
 
-      <div className="shrink-0 border-t border-line p-3">
-        <CommentForm vaultId={vaultId} assetId={assetId ?? undefined} />
-      </div>
+      {composer === null ? null : (
+        <div className="shrink-0 border-t border-line p-3">
+          {composer ?? <CommentForm vaultId={vaultId} assetId={assetId ?? undefined} />}
+        </div>
+      )}
     </section>
   );
 }
