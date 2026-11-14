@@ -1,0 +1,51 @@
+name: media worker
+
+on:
+  repository_dispatch:
+    types: [transcode]
+  workflow_dispatch:
+  schedule:
+    # Barrido de seguridad: recoge jobs cuyo dispatch falló.
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arca-worker
+  cancel-in-progress: false
+
+jobs:
+  transcode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Instalar ffmpeg y poppler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg poppler-utils
+
+      - name: Compilar worker
+        run: go build -o bin/arca-worker ./cmd/worker
+
+      - name: Procesar cola
+        run: ./bin/arca-worker -once
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+          S3_FORCE_PATH_STYLE: "true"
+          WORKER_MAX_ATTEMPTS: "3"
+          WORKER_JOB_TIMEOUT_SECONDS: "1200"
+          WORKER_TMP: /tmp

@@ -1,0 +1,30 @@
+{
+  "name": "arca",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @arca/web dev",
+    "build": "pnpm --filter @arca/web build",
+    "start": "pnpm --filter @arca/web start",
+    "lint": "pnpm --filter @arca/web lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "db:generate": "pnpm --filter @arca/db generate",
+    "db:migrate": "pnpm --filter @arca/db migrate",
+    "db:studio": "pnpm --filter @arca/db studio",
+    "db:seed": "pnpm --filter @arca/web seed",
+    "worker": "go run ./cmd/worker",
+    "worker:build": "go build -o bin/arca-worker ./cmd/worker",
+    "cli": "go run ./cmd/arca",
+    "go:test": "go test ./...",
+    "go:vet": "go vet ./..."
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "^5.9.3"
+  }
+}

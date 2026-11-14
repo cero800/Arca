@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# next
+.next/
+out/
+next-env.d.ts
+.turbo/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# build
+dist/
+bin/
+*.tsbuildinfo
+
+# go
+/arca-worker
+/arca
+*.test
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
