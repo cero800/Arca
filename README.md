@@ -62,6 +62,8 @@ go run ./cmd/arca health
 go run ./cmd/arca stats
 go run ./cmd/arca jobs list pending 20
 go run ./cmd/arca jobs retry <asset-id>
+go run ./cmd/arca put <baúl> <archivo...>
+go run ./cmd/arca pull <baúl> <destino>
 ```
 
 > El módulo Go usa `github.com/silver/arca` como placeholder. Cámbialo en `go.mod` y en los imports (`internal/*`, `cmd/*`) cuando definas el repositorio.
@@ -162,10 +164,11 @@ Para el disparo inmediato, crea un fine-grained PAT con permiso de **Contents: r
 - **Auth**: una sola cuenta. `emailAndPassword.disableSignUp = true` en la app; el seed crea la cuenta con una instancia que permite signup. Sesión de 30 días con cookie cache de 5 min.
 - **Baúles**: `vault` con slug único, descripción y borrado en cascada.
 - **Assets**: dedupe por `sha256` y baúl (índice único parcial), papelera con `deleted_at`, estados `uploading → processing → ready | error`.
-- **Subida**: el navegador pide un intent, sube el original directo a B2 (simple o multipart) y confirma; la API verifica con `HeadObject` y encola el job.
-- **Derivados**: tabla `derivative` con thumb, preview, poster, HLS, páginas de PDF, waveform y texto. El worker descarga el original a `/tmp`, ejecuta ffmpeg y sube los resultados.
+- **Subida**: el navegador pide un intent, sube el original directo a B2 (simple o multipart) y confirma; la API verifica con `HeadObject` y encola el job. La CLI (`arca put`) hace lo mismo contra Postgres y S3 sin pasar por la web, con dedupe y cuota.
+- **Derivados**: tabla `derivative` con thumb, preview, poster, storyboard, HLS, páginas de PDF, waveform y texto. El worker descarga el original a `/tmp`, ejecuta ffmpeg y sube los resultados.
+- **Video**: HLS 720p en fMP4 y un storyboard 10×10 (sprite WebP + VTT). El VTT se sirve desde `/api/assets/:id/storyboard` reescribiendo el sprite a una URL firmada; el reproductor pinta la miniatura al pasar el cursor por la barra.
 - **Comentarios**: `author_id` (owner) o `guest_id` (invitados), con `at_second` para notas de video/audio.
-- **Compartir**: `share_link` guarda solo el hash del token, con rol `viewer | commenter`, caducidad opcional y revocación. La cookie del invitado va firmada con HMAC; el enlace se valida en cada lectura y en cada petición HLS (`?share=`).
+- **Compartir**: `share_link` guarda solo el hash del token, con rol `viewer | commenter`, caducidad opcional y revocación. La cookie del invitado va firmada con HMAC; el enlace se valida en cada lectura y en cada petición HLS/storyboard (`?share=`).
 
 Decisiones detalladas en [`docs/adr`](docs/adr).
 
@@ -187,8 +190,8 @@ Decisiones detalladas en [`docs/adr`](docs/adr).
 - [x] Papelera y restauración desde la UI
 - [x] Enlaces para compartir + comentarios de invitados
 - [x] Quick look, `⌘K`, drag & drop desde portapapeles
-- [ ] CLI de backup (`arca put`, `arca pull`)
-- [ ] Storyboard VTT y scrubbing en video
+- [x] CLI de backup (`arca put`, `arca pull`)
+- [x] Storyboard VTT y scrubbing en video
 
 ## Scripts
 

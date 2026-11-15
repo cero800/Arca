@@ -21,6 +21,8 @@ Uso:
   arca jobs list [pending|processing|done|error] [límite]
   arca jobs retry <asset-id>
   arca stats
+  arca put <baúl> <archivo...>
+  arca pull <baúl> <destino>
 
 Variables: DATABASE_URL, S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_KEY, S3_SECRET.
 `
@@ -31,7 +33,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	timeout := 60 * time.Second
+	if os.Args[1] == "put" || os.Args[1] == "pull" {
+		timeout = 6 * time.Hour
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	cfg, err := config.Load()
@@ -46,6 +53,10 @@ func main() {
 		jobs(ctx, cfg)
 	case "stats":
 		stats(ctx, cfg)
+	case "put":
+		put(ctx, cfg, os.Args[2:])
+	case "pull":
+		pull(ctx, cfg, os.Args[2:])
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:

@@ -18,7 +18,7 @@ import { formatBytes, formatDuration, relativeTime, cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { CommentPanel } from "@/components/comments/comment-panel";
 import { FileIcon, kindLabel } from "./file-icon";
-import { VideoPlayer } from "./video-player";
+import { VideoPlayer, type StoryboardMeta } from "./video-player";
 import { TrashAssetButton } from "./asset-actions";
 
 type PreviewVault = {
@@ -30,6 +30,20 @@ type PreviewVault = {
 
 function previewOf(asset: ExplorerAsset, type: "thumb" | "preview" | "poster" | "audio_wave") {
   return asset.derivatives.find((item) => item.type === type)?.url ?? null;
+}
+
+function storyboardOf(asset: ExplorerAsset): StoryboardMeta | null {
+  const derivative = asset.derivatives.find((item) => item.type === "storyboard");
+  if (!derivative) return null;
+  const meta = (derivative.meta ?? {}) as Record<string, unknown>;
+  return {
+    tileWidth: Number(meta.tileWidth) || 160,
+    tileHeight: Number(meta.tileHeight) || 90,
+    columns: Number(meta.columns) || 10,
+    rows: Number(meta.rows) || 10,
+    tiles: Number(meta.tiles) || 0,
+    intervalMs: Number(meta.intervalMs) || 0,
+  };
 }
 
 function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -165,6 +179,9 @@ export function AssetPreview({
 
   if (asset.kind === "video") {
     const hasHls = asset.derivatives.some((item) => item.type === "hls");
+    const hasStoryboard = asset.derivatives.some((item) => item.type === "storyboard");
+    const storyboard = storyboardOf(asset);
+
     if (!hasHls && !asset.originalUrl) return <FallbackPreview asset={asset} />;
 
     return (
@@ -173,6 +190,8 @@ export function AssetPreview({
         poster={poster}
         fallbackUrl={asset.originalUrl}
         hasHls={hasHls}
+        hasStoryboard={hasStoryboard}
+        storyboard={storyboard}
         shareToken={shareToken}
       />
     );

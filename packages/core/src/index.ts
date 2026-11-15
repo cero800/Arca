@@ -30,7 +30,7 @@ export function storageKey(
     case "poster":
       return `${base}/poster.webp`;
     case "storyboard":
-      return `${base}/storyboard.jpg`;
+      return `${base}/storyboard.webp`;
     case "storyboard_vtt":
       return `${base}/storyboard.vtt`;
     case "master":

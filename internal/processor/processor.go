@@ -142,6 +142,41 @@ func (p *Processor) video(ctx context.Context, asset *store.Asset, original stri
 	}
 	result.Derivatives = append(result.Derivatives, derivative)
 
+	if result.DurationMS != nil && *result.DurationMS > 0 {
+		storyboard, storyboardErr := p.tools.Storyboard(ctx, original, dir, int64(*result.DurationMS))
+		if storyboardErr != nil {
+			// El storyboard es opcional: si falla, el video sigue siendo usable.
+			result.Metrics["storyboardError"] = storyboardErr.Error()
+		} else {
+			derivative, err = p.upload(
+				ctx, asset, keys.Storyboard(asset.VaultID, asset.ID),
+				storyboard.SpritePath, "storyboard", nil,
+			)
+			if err != nil {
+				return store.Result{}, err
+			}
+			width, height := storyboard.Width, storyboard.Height
+			derivative.Width = &width
+			derivative.Height = &height
+			derivative.Meta = storyboardMeta(storyboard.Plan, width, height)
+			result.Derivatives = append(result.Derivatives, derivative)
+
+			vttKey := keys.StoryboardVTT(asset.VaultID, asset.ID)
+			if err := p.storage.PutBytes(ctx, vttKey, storyboard.VTT, keys.MediaType(vttKey)); err != nil {
+				return store.Result{}, err
+			}
+			result.Derivatives = append(result.Derivatives, store.Derivative{
+				Type: "storyboard_vtt",
+				Key:  vttKey,
+				Size: int64(len(storyboard.VTT)),
+				Meta: storyboardMeta(storyboard.Plan, width, height),
+			})
+
+			result.Metrics["storyboardTiles"] = storyboard.Plan.Tiles
+			result.Metrics["storyboardIntervalMs"] = storyboard.Plan.IntervalMS
+		}
+	}
+
 	hlsDir := filepath.Join(dir, "hls")
 	if _, err := p.tools.HLS(ctx, original, hlsDir); err != nil {
 		return store.Result{}, err
@@ -250,6 +285,19 @@ func (p *Processor) text(ctx context.Context, asset *store.Asset, original strin
 		}},
 		Metrics: map[string]any{"truncated": truncated},
 	}, nil
+}
+
+func storyboardMeta(plan media.StoryboardPlan, width, height int) map[string]any {
+	return map[string]any{
+		"columns":    media.StoryboardColumns,
+		"rows":       media.StoryboardRows,
+		"tileWidth":  media.StoryboardTileWidth,
+		"tileHeight": media.StoryboardTileHeight,
+		"tiles":      plan.Tiles,
+		"intervalMs": plan.IntervalMS,
+		"width":      width,
+		"height":     height,
+	}
 }
 
 func (p *Processor) upload(

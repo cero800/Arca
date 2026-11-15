@@ -21,6 +21,15 @@ export type ExplorerDerivative = {
   meta?: Record<string, unknown> | null;
 };
 
+export type StoryboardMeta = {
+  tileWidth?: number;
+  tileHeight?: number;
+  columns?: number;
+  rows?: number;
+  tiles?: number;
+  intervalMs?: number;
+};
+
 export type ExplorerAsset = {
   id: string;
   name: string;

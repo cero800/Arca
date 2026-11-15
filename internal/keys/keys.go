@@ -17,6 +17,9 @@ func HLS(vaultID, assetID, name string) string {
 	return fmt.Sprintf("%s/hls/%s", base(vaultID, assetID), name)
 }
 
+// Original devuelve la key del archivo original subido por la web o la CLI.
+func Original(vaultID, assetID string) string { return Derivative(vaultID, assetID, "original") }
+
 func Thumb(vaultID, assetID string) string   { return Derivative(vaultID, assetID, "thumb.webp") }
 func Preview(vaultID, assetID string) string { return Derivative(vaultID, assetID, "preview.webp") }
 func Poster(vaultID, assetID string) string  { return Derivative(vaultID, assetID, "poster.webp") }
@@ -24,6 +27,12 @@ func AudioWave(vaultID, assetID string) string {
 	return Derivative(vaultID, assetID, "audio-wave.webp")
 }
 func Text(vaultID, assetID string) string { return Derivative(vaultID, assetID, "text.txt") }
+func Storyboard(vaultID, assetID string) string {
+	return Derivative(vaultID, assetID, "storyboard.webp")
+}
+func StoryboardVTT(vaultID, assetID string) string {
+	return Derivative(vaultID, assetID, "storyboard.vtt")
+}
 
 func MediaType(name string) string {
 	switch {

@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { and, eq, isNull } from "drizzle-orm";
-import { db, asset } from "@arca/db";
-import { auth } from "@/lib/auth";
+import { authorizeVideoAsset } from "@/lib/asset-access";
 import { rewritePlaylist } from "@/lib/hls";
-import { getShareContext } from "@/lib/share";
 import { getObjectText, presignGet } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -36,33 +32,14 @@ export async function GET(
     return NextResponse.json({ error: "Ruta inválida" }, { status: 400 });
   }
 
-  const session = await auth.api.getSession({ headers: await headers() });
   const shareToken = new URL(request.url).searchParams.get("share");
-  if (!session && !shareToken) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const access = await authorizeVideoAsset(id, shareToken);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const found = await db.query.asset.findFirst({
-    where: and(eq(asset.id, id), isNull(asset.deletedAt)),
-    columns: { id: true, vaultId: true, ownerId: true, kind: true },
-  });
-
-  if (!found || found.kind !== "video") {
-    return NextResponse.json({ error: "Video no encontrado" }, { status: 404 });
-  }
-
-  if (session) {
-    if (found.ownerId !== session.user.id) {
-      return NextResponse.json({ error: "Video no encontrado" }, { status: 404 });
-    }
-  } else {
-    const context = shareToken ? await getShareContext(shareToken) : null;
-    if (!context || context.vault.id !== found.vaultId) {
-      return NextResponse.json({ error: "Enlace no válido" }, { status: 404 });
-    }
-  }
-
-  const key = `vaults/${found.vaultId}/${found.id}/hls/${path.join("/")}`;
+  const base = `vaults/${access.vaultId}/${access.id}/hls`;
+  const key = `${base}/${path.join("/")}`;
   const fileName = path[path.length - 1] ?? "";
 
   if (!fileName.endsWith(".m3u8")) {
@@ -79,7 +56,7 @@ export async function GET(
     const rewritten = await rewritePlaylist(playlist, async (uri) => {
       const clean = uri.split("?")[0]?.trim();
       if (!clean || !SAFE_SEGMENT.test(clean)) return null;
-      return presignGet(`vaults/${found.vaultId}/${found.id}/hls/${clean}`, 3600);
+      return presignGet(`${base}/${clean}`, 3600);
     });
 
     return new NextResponse(rewritten, {

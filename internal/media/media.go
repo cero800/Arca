@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,14 @@ import (
 	"strings"
 
 	"github.com/silver/arca/internal/config"
+)
+
+const (
+	StoryboardColumns    = 10
+	StoryboardRows       = 10
+	StoryboardTileWidth  = 160
+	StoryboardTileHeight = 90
+	StoryboardMaxTiles   = StoryboardColumns * StoryboardRows
 )
 
 type Tools struct {
@@ -135,6 +144,137 @@ func (t *Tools) HLS(ctx context.Context, src, dir string) (string, error) {
 		return "", err
 	}
 	return master, nil
+}
+
+// StoryboardPlan describe cuántos fotogramas caben en la grilla y cada cuánto.
+type StoryboardPlan struct {
+	IntervalMS int64
+	Tiles      int
+}
+
+type Storyboard struct {
+	SpritePath string
+	VTT        []byte
+	Width      int
+	Height     int
+	Plan       StoryboardPlan
+}
+
+// PlanStoryboard reparte la duración en como mucho 100 miniaturas.
+// Para videos cortos usa 1 segundo; para largos, una fracción proporcional.
+func PlanStoryboard(durationMS int64) StoryboardPlan {
+	if durationMS <= 0 {
+		return StoryboardPlan{}
+	}
+
+	seconds := float64(durationMS) / 1000
+	interval := seconds / StoryboardMaxTiles
+	if interval < 1 {
+		interval = 1
+	}
+
+	intervalMS := int64(math.Round(interval * 1000))
+	if intervalMS < 1000 {
+		intervalMS = 1000
+	}
+
+	tiles := int(math.Ceil(float64(durationMS) / float64(intervalMS)))
+	if tiles < 1 {
+		tiles = 1
+	}
+	if tiles > StoryboardMaxTiles {
+		tiles = StoryboardMaxTiles
+	}
+
+	return StoryboardPlan{IntervalMS: intervalMS, Tiles: tiles}
+}
+
+// BuildStoryboardVTT genera los cues que apuntan a cada celda del sprite.
+func BuildStoryboardVTT(plan StoryboardPlan, durationMS int64) []byte {
+	var body strings.Builder
+	body.WriteString("WEBVTT\n\n")
+
+	for index := 0; index < plan.Tiles; index++ {
+		start := int64(index) * plan.IntervalMS
+		end := start + plan.IntervalMS
+		if end > durationMS {
+			end = durationMS
+		}
+		if end <= start {
+			continue
+		}
+
+		column := index % StoryboardColumns
+		row := index / StoryboardColumns
+		fmt.Fprintf(
+			&body,
+			"%s --> %s\nstoryboard.webp#xywh=%d,%d,%d,%d\n\n",
+			formatVTTTime(start),
+			formatVTTTime(end),
+			column*StoryboardTileWidth,
+			row*StoryboardTileHeight,
+			StoryboardTileWidth,
+			StoryboardTileHeight,
+		)
+	}
+
+	return []byte(body.String())
+}
+
+// Storyboard extrae una grilla 10x10 de miniaturas y su VTT.
+func (t *Tools) Storyboard(ctx context.Context, src, dir string, durationMS int64) (Storyboard, error) {
+	plan := PlanStoryboard(durationMS)
+	if plan.Tiles == 0 {
+		return Storyboard{}, fmt.Errorf("el video no tiene duración para generar el storyboard")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return Storyboard{}, err
+	}
+
+	sprite := filepath.Join(dir, "storyboard.webp")
+	interval := strconv.FormatFloat(float64(plan.IntervalMS)/1000, 'f', 3, 64)
+	filter := fmt.Sprintf(
+		"fps=1/%s,scale=%d:%d:force_original_aspect_ratio=decrease,"+
+			"pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black,tile=%dx%d",
+		interval,
+		StoryboardTileWidth, StoryboardTileHeight,
+		StoryboardTileWidth, StoryboardTileHeight,
+		StoryboardColumns, StoryboardRows,
+	)
+
+	err := t.run(ctx, t.ffmpeg,
+		"-y", "-hide_banner", "-loglevel", "error",
+		"-i", src,
+		"-an",
+		"-vf", filter,
+		"-frames:v", "1",
+		"-c:v", "libwebp", "-quality", "80",
+		sprite,
+	)
+	if err != nil {
+		return Storyboard{}, err
+	}
+
+	return Storyboard{
+		SpritePath: sprite,
+		VTT:        BuildStoryboardVTT(plan, durationMS),
+		Width:      StoryboardColumns * StoryboardTileWidth,
+		Height:     StoryboardRows * StoryboardTileHeight,
+		Plan:       plan,
+	}, nil
+}
+
+func formatVTTTime(ms int64) string {
+	if ms < 0 {
+		ms = 0
+	}
+	hours := ms / 3_600_000
+	ms %= 3_600_000
+	minutes := ms / 60_000
+	ms %= 60_000
+	seconds := ms / 1000
+	millis := ms % 1000
+	return fmt.Sprintf("%02d:%02d:%02d.%03d", hours, minutes, seconds, millis)
 }
 
 func (t *Tools) AudioWave(ctx context.Context, src, dst string) error {
