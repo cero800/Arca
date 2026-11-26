@@ -104,7 +104,7 @@ Variables del worker: `WORKER_MAX_ATTEMPTS`, `WORKER_LEASE_SECONDS`, `WORKER_POL
 1. Crea un bucket **privado** (ej. `arca-media`, región `us-west-004`).
 2. Crea una application key con acceso solo a ese bucket (read/write/list/delete).
 3. `S3_ENDPOINT` es el endpoint S3 de la región, p. ej. `https://s3.us-west-004.backblazeb2.com`.
-4. Configura CORS para permitir subidas directas desde el navegador y exponer `ETag` (necesario para multipart):
+4. Configura CORS para permitir subidas directas desde el navegador y exponer `ETag` (necesario para multipart). El dashboard no tiene editor de CORS: usa la CLI de B2 con la **master application key**, porque `b2_update_bucket` exige `writeBuckets` y esa capability no se puede dar a una key limitada al bucket:
 
 ```json
 [
