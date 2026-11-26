@@ -6,7 +6,7 @@ Checklist para poner Arca en producción con **Aiven Free + Backblaze B2 + Verce
 
 - Aiven Free no permite elegir región ni tiene pooler: usa la **misma** cadena en `DATABASE_URL` y `DATABASE_URL_DIRECT`.
 - Conserva `?sslmode=require`. Codifica caracteres especiales del password en la URI.
-- `max_connections = 20`; el pool de la web en producción es 2 y las conexiones inactivas se cierran a los 5 s. Si se agotan los slots, reinicia el servicio desde la consola o con `avn service restart <nombre>`.
+- `max_connections = 20`; el pool de la web en producción es 2 y las conexiones inactivas se cierran a los 5 s. Si se agotan los slots, apaga y enciende el servicio: `avn service update <nombre> --power-off` / `avn service update <nombre> --power-on` (la CLI **no** tiene `avn service restart`). También se puede hacer en Console → servicio → **Actions → Power off / Power on**. Los datos se conservan; al encender se restaura el último backup.
 - Si el servicio está apagado por inactividad: Console → servicio → **Power on**.
 
 Obtener la URI:
@@ -33,7 +33,7 @@ cat > rules.json <<'EOF'
 [
   {
     "corsRuleName": "arca-web",
-    "allowedOrigins": ["http://localhost:3000", "https://mi-arca.vercel.app"],
+    "allowedOrigins": ["http://localhost:3000", "https://mi-arca.vercel.app", "https://mi-arca-gamma.vercel.app"],
     "allowedOperations": ["s3_get", "s3_put", "s3_head", "s3_post"],
     "allowedHeaders": ["*"],
     "exposeHeaders": ["ETag", "x-amz-request-id"],
@@ -47,7 +47,9 @@ EOF
 ```
 
 - En Arch, `pip install` global falla por PEP 668: usa el venv, `pipx install b2` o el binario self-contained de B2.
-- lifecycle: abortar multipart incompletos después de 1 día.
+- Algunas versiones del binario self-contained fallan al parsear `--cors-rules` (`Types.GenericAlias.__pydantic_config__`). Si pasa, llama a `b2_update_bucket` con `curl` usando el `account_auth_token` cacheado en `~/.config/b2/account_info` (SQLite) y el `api_url` de la misma tabla.
+- El origen debe ser **exactamente** el host desde el que se abre la web. Si el proyecto de Vercel se llamó `mi-arca-gamma`, añade `https://mi-arca-gamma.vercel.app` al CORS; si falta, el `PUT` del navegador falla y el asset queda en `uploading`.
+- lifecycle: abortar multipart incompletos después de 1 día (`daysFromStartingToCancelingUnfinishedLargeFiles: 1`). No uses `daysFromHidingToDeleting`, porque oculta/borra archivos sanos.
 - La master key es **solo** para la CLI; nunca va en `.env`, GitHub ni Vercel.
 
 ## 3. Local: `.env` de la raíz
@@ -106,8 +108,8 @@ PAT para disparar el worker desde la web:
 
 | Variable | Valor |
 | --- | --- |
-| `APP_URL` | `https://mi-arca.vercel.app` |
-| `BETTER_AUTH_URL` | `https://mi-arca.vercel.app` |
+| `APP_URL` | `https://mi-arca-gamma.vercel.app` |
+| `BETTER_AUTH_URL` | `https://mi-arca-gamma.vercel.app` |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
 | `DATABASE_URL` | URI de Aiven |
 | `DATABASE_URL_DIRECT` | URI de Aiven (la misma) |
@@ -124,7 +126,7 @@ PAT para disparar el worker desde la web:
 
 `OWNER_*` **no** van en Vercel: solo los usa el seed local.
 
-- Dominio `mi-arca.vercel.app` en el proyecto.
+- Dominio `mi-arca-gamma.vercel.app` en el proyecto (`mi-arca.vercel.app` pertenece a otra app). Debe coincidir con `APP_URL`, `BETTER_AUTH_URL` y con un origen del CORS de B2.
 - Región de functions: dejar `iad1` (default), coherente con B2 US East.
 
 ## 6. Orden y verificación final
@@ -133,14 +135,14 @@ PAT para disparar el worker desde la web:
 2. B2 bucket + key + CORS + lifecycle.
 3. GitHub Secrets + PAT.
 4. Vercel con todas las variables y dominio.
-5. Entrar en `https://mi-arca.vercel.app` con el owner → subir un archivo real.
+5. Entrar en `https://mi-arca-gamma.vercel.app` con el owner → subir un archivo real.
 6. Comprobar en `https://github.com/cero800/Arca/actions` que `transcode.yml` procesa el job.
 7. Verificar HLS, storyboard y enlace de compartir desde otro navegador.
 
 Comandos útiles:
 
 ```bash
-curl -s https://mi-arca.vercel.app/api/health
+curl -s https://mi-arca-gamma.vercel.app/api/health
 go run ./cmd/arca stats
 go run ./cmd/arca jobs list
 psql "$DATABASE_URL_DIRECT" -c 'select original_name, status, kind from asset order by created_at desc limit 5;'

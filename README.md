@@ -2,7 +2,7 @@
 
 Archivo privado para guardar lo que quieres conservar: imágenes, videos, PDFs, audio y texto, organizados en **baúles**. Un solo dueño, sin registro público.
 
-> Estado: **etapa 1–3 en progreso**. Funcionan auth, baúles, subida directa a B2, comentarios, explorador con vista previa, papelera, worker de medios y enlaces para compartir. El player HLS usa un endpoint propio que reescribe la playlist con URLs firmadas por segmento.
+> Estado: **en producción** en `https://mi-arca-gamma.vercel.app`. Funcionan auth, baúles, subida directa a B2, comentarios, explorador con vista previa, papelera, worker de medios y enlaces para compartir. El player HLS usa un endpoint propio que reescribe la playlist con URLs firmadas por segmento.
 
 ## Stack
 
@@ -10,14 +10,14 @@ Archivo privado para guardar lo que quieres conservar: imágenes, videos, PDFs, 
 | --- | --- |
 | Web | Next.js 15 (App Router) + React 19 + Tailwind v4 |
 | Auth | Better Auth (email/password, signup deshabilitado) |
-| Base de datos | Postgres en Neon Free + Drizzle ORM |
+| Base de datos | Postgres en Aiven Free + Drizzle ORM |
 | Storage | Backblaze B2 (bucket privado, URLs firmadas) |
 | Worker | Go + ffmpeg/ffprobe + pdftoppm |
 | Cola | `processing_job` en Postgres con `FOR UPDATE SKIP LOCKED` |
 | Deploy | Vercel Hobby |
 | CI / worker | GitHub Actions (repo público) |
 
-Coste objetivo: **$0** sin tarjeta. B2 free tier: 10 GB de storage; Neon Free: 0.5 GB; Vercel Hobby; Actions gratis en repos públicos.
+Coste objetivo: **$0** sin tarjeta. B2 free tier: 10 GB de storage; Aiven Free: 1 GB; Vercel Hobby; Actions gratis en repos públicos.
 
 ## Estructura
 
@@ -86,8 +86,8 @@ Crea el bucket `arca-media` y deja `S3_FORCE_PATH_STYLE=true`. El SDK desactiva 
 | --- | --- |
 | `APP_URL`, `BETTER_AUTH_URL` | Origen público de la app |
 | `BETTER_AUTH_SECRET` | Secreto de 32+ caracteres |
-| `DATABASE_URL` | Neon pooled (web) |
-| `DATABASE_URL_DIRECT` | Neon directo (migraciones y worker) |
+| `DATABASE_URL` | URI de Aiven (web) |
+| `DATABASE_URL_DIRECT` | La misma URI de Aiven (migraciones y worker) |
 | `OWNER_EMAIL`, `OWNER_NAME`, `OWNER_PASSWORD` | Solo para `db:seed` |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | Backblaze B2 |
 | `S3_KEY`, `S3_SECRET` | Application key restringida al bucket |
@@ -101,16 +101,16 @@ Variables del worker: `WORKER_MAX_ATTEMPTS`, `WORKER_LEASE_SECONDS`, `WORKER_POL
 
 ## Backblaze B2
 
-1. Crea un bucket **privado** (ej. `arca-media`, región `us-west-004`).
+1. Crea un bucket **privado** (ej. `arca-media`). La región se elige al crear la cuenta; en US East el endpoint es `https://s3.us-east-005.backblazeb2.com` y `S3_REGION=us-east-005`.
 2. Crea una application key con acceso solo a ese bucket (read/write/list/delete).
-3. `S3_ENDPOINT` es el endpoint S3 de la región, p. ej. `https://s3.us-west-004.backblazeb2.com`.
+3. La master application key es solo para configurar CORS/lifecycle; nunca va en `.env`, GitHub ni Vercel.
 4. Configura CORS para permitir subidas directas desde el navegador y exponer `ETag` (necesario para multipart). El dashboard no tiene editor de CORS: usa la CLI de B2 con la **master application key**, porque `b2_update_bucket` exige `writeBuckets` y esa capability no se puede dar a una key limitada al bucket:
 
 ```json
 [
   {
     "corsRuleName": "arca-web",
-    "allowedOrigins": ["http://localhost:3000", "https://mi-arca.vercel.app"],
+    "allowedOrigins": ["http://localhost:3000", "https://mi-arca.vercel.app", "https://mi-arca-gamma.vercel.app"],
     "allowedOperations": ["s3_get", "s3_put", "s3_head", "s3_post"],
     "allowedHeaders": ["*"],
     "exposeHeaders": ["ETag", "x-amz-request-id"],
@@ -123,26 +123,26 @@ Variables del worker: `WORKER_MAX_ATTEMPTS`, `WORKER_LEASE_SECONDS`, `WORKER_POL
 
 El bucket nunca es público: la web firma `GET` por 1 hora y las subidas usan URLs prefirmadas de 15 minutos (multipart en partes de 16 MB, concurrencia 3).
 
-## Neon
+## Aiven Free
 
-- Proyecto en la región más cercana posible a Vercel.
-- `DATABASE_URL` con el host **pooled** (`-pooler`) para la web.
-- `DATABASE_URL_DIRECT` con el host directo para migraciones y worker.
-- El cliente usa `prepare: false` porque el pooler de Neon no soporta prepared statements en modo transacción.
+- No permite elegir región ni tiene pooler: usa la misma URI en `DATABASE_URL` y `DATABASE_URL_DIRECT`, con `?sslmode=require`.
+- `max_connections = 20`, así que el pool de producción es 2 por instancia y las conexiones inactivas se cierran a los 5 s. Si se agotan los slots, apaga y enciende el servicio desde Console → Actions → **Power off / Power on** (la CLI no tiene `avn service restart`). Al encender se restaura el último backup; vuelve a correr migraciones y seed si hiciera falta.
+- El cliente usa `prepare: false` para evitar prepared statements innecesarios.
+- Planes gratuitos descartados: Supabase se pausa por inactividad, Cockroach caduca a los 30 días, Neon no funcionó en este setup.
 
 ## Deploy en Vercel
 
 1. Importa el repositorio (monorepo pnpm; Vercel detecta el workspace).
 2. Root directory: `apps/web`. Build command: `pnpm build`. Install: `pnpm install`.
 3. Añade todas las variables de entorno de producción.
-4. Ejecuta las migraciones con el workflow **migrate** o en local apuntando a Neon:
+4. Ejecuta las migraciones con el workflow **migrate** o en local apuntando a Aiven:
 
 ```bash
 DATABASE_URL_DIRECT="postgres://..." pnpm db:migrate
 ```
 
 5. Ejecuta el seed una vez con las credenciales del owner.
-6. Configura el dominio `mi-arca.vercel.app` en `APP_URL` y `BETTER_AUTH_URL`.
+6. Configura el dominio real del proyecto en `APP_URL` y `BETTER_AUTH_URL` (en producción: `https://mi-arca-gamma.vercel.app`, porque `mi-arca.vercel.app` ya está ocupado) y añade ese mismo origen al CORS de B2.
 
 ## GitHub Actions
 
