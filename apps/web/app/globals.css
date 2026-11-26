@@ -95,6 +95,16 @@
     background: rgb(255 255 255 / 0.16);
     background-clip: content-box;
   }
+
+  @media (pointer: coarse) {
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      border-width: 1px;
+    }
+  }
 }
 
 @layer components {
@@ -116,6 +126,16 @@
     background: var(--color-surface-2);
     border: 1px solid var(--color-line);
     box-shadow: var(--shadow-panel);
+  }
+
+  /* Panel inferior móvil: evita el scroll chaining y respeta el notch. */
+  .sheet-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .skeleton {

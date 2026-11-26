@@ -5,6 +5,7 @@ import { Lock, MessageSquare } from "lucide-react";
 import type { ExplorerAsset, ExplorerComment } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import { AssetList, AssetSearch, ViewToggle } from "@/components/explorer/asset-list";
+import { MobileAssetSheet } from "@/components/explorer/mobile-asset-sheet";
 import { PreviewPanel } from "@/components/explorer/preview-panel";
 import { QuickLook } from "@/components/explorer/quick-look";
 import { GuestCommentForm } from "@/components/comments/guest-comment-form";
@@ -38,6 +39,7 @@ export function SharedViewer({
   const [view, setView] = useState<"list" | "grid">("list");
   const [query, setQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"preview" | "notes">("preview");
   const [quickLookOpen, setQuickLookOpen] = useState(false);
 
   const visible = useMemo(
@@ -52,8 +54,18 @@ export function SharedViewer({
     ? visible.findIndex((asset) => asset.id === selected.id)
     : -1;
 
-  const select = useCallback((id: string) => {
-    setSelectedId(id);
+  const select = useCallback(
+    (id: string, preserveTab = false) => {
+      setSelectedId(id);
+      setMobileOpen(true);
+      if (!preserveTab) setMobileTab("preview");
+    },
+    [],
+  );
+
+  const openVaultNotes = useCallback(() => {
+    setSelectedId(null);
+    setMobileTab("notes");
     setMobileOpen(true);
   }, []);
 
@@ -70,13 +82,24 @@ export function SharedViewer({
             : visible.length - 1
           : (current + direction + visible.length) % visible.length;
       const next = visible[nextIndex];
-      if (next) setSelectedId(next.id);
+      if (next) select(next.id, mobileOpen);
     },
-    [selected, visible],
+    [selected, visible, select, mobileOpen],
   );
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        if (quickLookOpen) {
+          setQuickLookOpen(false);
+        } else if (mobileOpen) {
+          setMobileOpen(false);
+        } else {
+          setSelectedId(null);
+        }
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
       const typing =
         target?.tagName === "INPUT" ||
@@ -100,13 +123,6 @@ export function SharedViewer({
       } else if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault();
         step(-1);
-      } else if (event.key === "Escape") {
-        if (quickLookOpen) {
-          setQuickLookOpen(false);
-          return;
-        }
-        setMobileOpen(false);
-        setSelectedId(null);
       } else if (event.key === "/") {
         event.preventDefault();
         document.getElementById("arca-asset-search")?.focus();
@@ -115,7 +131,7 @@ export function SharedViewer({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [quickLookOpen, selected, step]);
+  }, [quickLookOpen, mobileOpen, selected, step]);
 
   useEffect(() => {
     if (quickLookOpen && (!selected || selectedIndex < 0)) {
@@ -171,9 +187,18 @@ export function SharedViewer({
       </header>
 
       <div className="relative flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="flex min-h-0 min-w-0 flex-col">
+        <section inert={mobileOpen} className="flex min-h-0 min-w-0 flex-col">
           <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
             <AssetSearch value={query} onChange={setQuery} />
+            <button
+              type="button"
+              onClick={openVaultNotes}
+              aria-label={`Notas del baúl (${comments.filter((item) => item.assetId === null && item.parentId === null).length})`}
+              title="Notas del baúl"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] border border-line text-faint transition-colors hover:border-line-strong hover:text-ink lg:hidden"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+            </button>
             <ViewToggle view={view} onChange={setView} />
           </div>
 
@@ -206,25 +231,23 @@ export function SharedViewer({
           />
         </aside>
 
-        {mobileOpen && selected ? (
-          <div className="fixed inset-0 z-50 flex flex-col bg-bg lg:hidden">
-            <PreviewPanel
-              vault={vault}
-              asset={selected}
-              comments={comments}
-              onClose={() => setMobileOpen(false)}
-              onPrevious={() => step(-1)}
-              onNext={() => step(1)}
-              onQuickLook={() => setQuickLookOpen(true)}
-              readOnly
-              shareToken={token}
-              composer={composer}
-              privacyLabel={
-                canComment ? "Enlace privado · comentarios" : "Enlace privado · solo lectura"
-              }
-              className="min-h-0 flex-1"
-            />
-          </div>
+        {mobileOpen ? (
+          <MobileAssetSheet
+            vault={vault}
+            asset={selected}
+            comments={comments}
+            initialTab={mobileTab}
+            onClose={() => setMobileOpen(false)}
+            onPrevious={() => step(-1)}
+            onNext={() => step(1)}
+            onQuickLook={() => setQuickLookOpen(true)}
+            readOnly
+            shareToken={token}
+            composer={composer}
+            privacyLabel={
+              canComment ? "Enlace privado · comentarios" : "Enlace privado · solo lectura"
+            }
+          />
         ) : null}
 
         {quickLookOpen && selected && selectedIndex >= 0 ? (

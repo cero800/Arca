@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Command, Settings2, Trash2, UploadCloud } from "lucide-react";
+import { Command, MessageSquare, Settings2, Trash2, UploadCloud } from "lucide-react";
 import type { ExplorerAsset, ExplorerComment, VaultSummary } from "@/lib/queries";
 import { MAX_UPLOAD_BYTES, uploadFile } from "@/lib/upload-client";
 
@@ -11,6 +11,7 @@ import { UploadButton } from "@/components/upload/upload-button";
 import { UploadTray, type UploadItem } from "@/components/upload/upload-tray";
 import { AssetList, AssetSearch, ViewToggle } from "./asset-list";
 import { CommandPalette } from "./command-palette";
+import { MobileAssetSheet } from "./mobile-asset-sheet";
 import { PreviewPanel } from "./preview-panel";
 import { QuickLook } from "./quick-look";
 
@@ -64,6 +65,7 @@ export function Explorer({
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [dragging, setDragging] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"preview" | "notes">("preview");
   const [quickLookOpen, setQuickLookOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const dragDepth = useRef(0);
@@ -91,8 +93,18 @@ export function Explorer({
     return () => clearInterval(timer);
   }, [hasProcessing, uploadsActive, router]);
 
-  const select = useCallback((id: string) => {
-    setSelectedId(id);
+  const select = useCallback(
+    (id: string, preserveTab = false) => {
+      setSelectedId(id);
+      setMobileOpen(true);
+      if (!preserveTab) setMobileTab("preview");
+    },
+    [],
+  );
+
+  const openVaultNotes = useCallback(() => {
+    setSelectedId(null);
+    setMobileTab("notes");
     setMobileOpen(true);
   }, []);
 
@@ -107,9 +119,9 @@ export function Explorer({
             : visible.length - 1
           : (current + direction + visible.length) % visible.length;
       const next = visible[nextIndex];
-      if (next) select(next.id);
+      if (next) select(next.id, mobileOpen);
     },
-    [visible, selected, select],
+    [visible, selected, select, mobileOpen],
   );
 
   /* Atajos: ⌘K comandos, Espacio vista rápida, j/k o flechas, Esc, "/" buscar. */
@@ -123,6 +135,18 @@ export function Explorer({
       }
 
       if (paletteOpen) return;
+
+      /* Escape cierra siempre el nivel superior, incluso desde un textarea. */
+      if (event.key === "Escape") {
+        if (quickLookOpen) {
+          setQuickLookOpen(false);
+        } else if (mobileOpen) {
+          setMobileOpen(false);
+        } else {
+          setSelectedId(null);
+        }
+        return;
+      }
 
       const target = event.target as HTMLElement | null;
       const typing =
@@ -147,13 +171,6 @@ export function Explorer({
       } else if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault();
         step(-1);
-      } else if (event.key === "Escape") {
-        if (quickLookOpen) {
-          setQuickLookOpen(false);
-          return;
-        }
-        setMobileOpen(false);
-        setSelectedId(null);
       } else if (event.key === "/") {
         event.preventDefault();
         document.getElementById("arca-asset-search")?.focus();
@@ -162,7 +179,7 @@ export function Explorer({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [paletteOpen, quickLookOpen, selected, step]);
+  }, [paletteOpen, quickLookOpen, mobileOpen, selected, step]);
 
   /* Si el filtro deja fuera el archivo abierto, cierra la vista rápida. */
   useEffect(() => {
@@ -341,7 +358,7 @@ export function Explorer({
         }}
       />
 
-      <section className="flex min-h-0 min-w-0 flex-col">
+      <section inert={mobileOpen} className="flex min-h-0 min-w-0 flex-col">
         <header className="flex h-[60px] shrink-0 items-center gap-3 border-b border-line px-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
@@ -390,6 +407,15 @@ export function Explorer({
 
         <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
           <AssetSearch value={query} onChange={setQuery} />
+          <button
+            type="button"
+            onClick={openVaultNotes}
+            aria-label={`Notas del baúl (${comments.filter((item) => item.assetId === null && item.parentId === null).length})`}
+            title="Notas del baúl"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] border border-line text-faint transition-colors hover:border-line-strong hover:text-ink lg:hidden"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+          </button>
           <ViewToggle view={view} onChange={setView} />
         </div>
 
@@ -433,19 +459,17 @@ export function Explorer({
         />
       </aside>
 
-      {mobileOpen && selected ? (
-        <div className="fixed inset-0 z-50 flex flex-col bg-bg lg:hidden">
-          <PreviewPanel
-            vault={vault}
-            asset={selected}
-            comments={comments}
-            onClose={() => setMobileOpen(false)}
-            onPrevious={() => step(-1)}
-            onNext={() => step(1)}
-            onQuickLook={() => setQuickLookOpen(true)}
-            className="min-h-0 flex-1"
-          />
-        </div>
+      {mobileOpen ? (
+        <MobileAssetSheet
+          vault={vault}
+          asset={selected}
+          comments={comments}
+          initialTab={mobileTab}
+          onClose={() => setMobileOpen(false)}
+          onPrevious={() => step(-1)}
+          onNext={() => step(1)}
+          onQuickLook={() => setQuickLookOpen(true)}
+        />
       ) : null}
 
       {quickLookOpen && selected && selectedIndex >= 0 ? (

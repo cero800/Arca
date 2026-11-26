@@ -46,7 +46,7 @@ function storyboardOf(asset: ExplorerAsset): StoryboardMeta | null {
   };
 }
 
-function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
+export function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-line/60 py-1.5 last:border-0">
       <dt className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
