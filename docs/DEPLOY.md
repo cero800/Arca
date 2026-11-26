@@ -6,7 +6,7 @@ Checklist para poner Arca en producción con **Aiven Free + Backblaze B2 + Verce
 
 - Aiven Free no permite elegir región ni tiene pooler: usa la **misma** cadena en `DATABASE_URL` y `DATABASE_URL_DIRECT`.
 - Conserva `?sslmode=require`. Codifica caracteres especiales del password en la URI.
-- `max_connections = 20`; el pool de la web en producción es 5, suficiente para un solo owner.
+- `max_connections = 20`; el pool de la web en producción es 2 y las conexiones inactivas se cierran a los 5 s. Si se agotan los slots, reinicia el servicio desde la consola o con `avn service restart <nombre>`.
 - Si el servicio está apagado por inactividad: Console → servicio → **Power on**.
 
 Obtener la URI:
