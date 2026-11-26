@@ -12,10 +12,13 @@ const globalForDb = globalThis as unknown as {
 const sql =
   globalForDb.arcaSql ??
   postgres(connectionString, {
-    max: process.env.NODE_ENV === "production" ? 5 : 10,
-    // Neon/pgbouncer no soporta prepared statements en modo transacción.
+    // Aiven Free tiene max_connections=20 y Vercel puede abrir varias
+    // instancias: mantener el pool pequeño evita agotar las conexiones.
+    max: process.env.NODE_ENV === "production" ? 2 : 10,
+    // Aiven no tiene pooler; tampoco hace falta prepared statements.
     prepare: false,
-    idle_timeout: 20,
+    idle_timeout: 5,
+    max_lifetime: 30,
     connect_timeout: 15,
   });
 
