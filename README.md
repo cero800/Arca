@@ -66,7 +66,7 @@ go run ./cmd/arca put <baúl> <archivo...>
 go run ./cmd/arca pull <baúl> <destino>
 ```
 
-> El módulo Go usa `github.com/silver/arca` como placeholder. Cámbialo en `go.mod` y en los imports (`internal/*`, `cmd/*`) cuando definas el repositorio.
+> El módulo Go es `github.com/cero800/Arca`, el mismo nombre del repositorio.
 
 ### Storage opcional en local
 

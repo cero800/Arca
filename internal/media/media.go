@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/silver/arca/internal/config"
+	"github.com/cero800/Arca/internal/config"
 )
 
 const (

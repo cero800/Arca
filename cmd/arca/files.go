@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/silver/arca/internal/config"
-	"github.com/silver/arca/internal/filetype"
-	"github.com/silver/arca/internal/id"
-	"github.com/silver/arca/internal/keys"
-	"github.com/silver/arca/internal/storage"
-	"github.com/silver/arca/internal/store"
+	"github.com/cero800/Arca/internal/config"
+	"github.com/cero800/Arca/internal/filetype"
+	"github.com/cero800/Arca/internal/id"
+	"github.com/cero800/Arca/internal/keys"
+	"github.com/cero800/Arca/internal/storage"
+	"github.com/cero800/Arca/internal/store"
 )
 
 func put(ctx context.Context, cfg config.Config, args []string) {

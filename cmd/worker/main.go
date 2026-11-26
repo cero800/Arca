@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/silver/arca/internal/config"
-	"github.com/silver/arca/internal/media"
-	"github.com/silver/arca/internal/processor"
-	"github.com/silver/arca/internal/storage"
-	"github.com/silver/arca/internal/store"
+	"github.com/cero800/Arca/internal/config"
+	"github.com/cero800/Arca/internal/media"
+	"github.com/cero800/Arca/internal/processor"
+	"github.com/cero800/Arca/internal/storage"
+	"github.com/cero800/Arca/internal/store"
 )
 
 func main() {

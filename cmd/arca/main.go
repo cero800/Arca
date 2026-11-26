@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/silver/arca/internal/config"
-	"github.com/silver/arca/internal/storage"
-	"github.com/silver/arca/internal/store"
+	"github.com/cero800/Arca/internal/config"
+	"github.com/cero800/Arca/internal/storage"
+	"github.com/cero800/Arca/internal/store"
 )
 
 const usage = `arca — CLI de Arca

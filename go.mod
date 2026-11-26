@@ -1,4 +1,4 @@
-module github.com/silver/arca
+module github.com/cero800/Arca
 
 go 1.24.0
 
